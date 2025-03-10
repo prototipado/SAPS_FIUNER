@@ -168,19 +168,19 @@ void SwitchesTask(void *pvParameter){
             switch(state){
                 case DATALOGGING:
                     NeoPixelAllColor(NEOPIXEL_COLOR_GREEN);
-                    printf("\r\n Pasando a modo DATALOGGING sin THRESHOLD \r\n");
+                    printf("\n Pasando a modo DATALOGGING sin THRESHOLD \n");
                 break;
                 case DATALOGGING_THR:
                     NeoPixelAllColor(NEOPIXEL_COLOR_BLUE);
-                    printf("\r\n Pasando a modo DATALOGGING con THRESHOLD \r\n");
+                    printf("\n Pasando a modo DATALOGGING con THRESHOLD \n");
                 break;
                 case RECORD:
                     NeoPixelAllColor(NEOPIXEL_COLOR_RED);
-                    printf("\r\n Pasando a modo GRABACION \r\n");
+                    printf("\n Pasando a modo GRABACION \n");
                 break;
                 case INFERRING:
                     NeoPixelAllColor(NEOPIXEL_COLOR_YELLOW);
-                    printf("\r\n Pasando a modo INFERENCIA \r\n");
+                    printf("\n Pasando a modo INFERENCIA \n");
                 break;
             }
             vTaskDelay(300 / portTICK_PERIOD_MS);
@@ -246,11 +246,11 @@ void ProcessTask(void *pvParameter){
                 #ifdef FILTER
                 printf("%1.2f,", x_G_filt);
                 printf("%1.2f,", y_G_filt);
-                printf("%1.2f\r\n", z_G_filt);
+                printf("%1.2f\n", z_G_filt);
                 #else
                 printf("%1.2f,", x_G);
                 printf("%1.2f,", y_G);
-                printf("%1.2f\r\n", z_G);
+                printf("%1.2f\n", z_G);
                 #endif
                 frame = 0;
                 record_state = REFRACT_REC;
@@ -277,7 +277,7 @@ void ProcessTask(void *pvParameter){
             #ifdef FILTER
             printf("%1.2f,",	mag_filt);
             #endif
-            printf("%1.2f\r\n",	mag);
+            printf("%1.2f\n",	mag);
             break; /* Fin del modo Adquisición de datos sin Umbral*/
         /* Modo Adquisición de datos con Umbral*/
         case DATALOGGING_THR:  
@@ -291,7 +291,7 @@ void ProcessTask(void *pvParameter){
                 printf("%1.2f,", 	x_G);
                 printf("%1.2f,",    y_G);
                 printf("%1.2f,",	z_G);
-                printf("%1.2f\r\n",	mag);
+                printf("%1.2f\n",	mag);
             }
             else{
                 LedOff(LED_2);
@@ -331,7 +331,7 @@ void ProcessTask(void *pvParameter){
                     features[1] = y_mean / NUM_SAMPLES;
                     features[2] = z_mean / NUM_SAMPLES;
                     /* Fin de cálculo de features */
-                    printf("%s\r\n", predictLabel(features));
+                    printf("%s\n", predictLabel(features));
                     frame = 0;
                     record_state = REFRACT_REC;
                     LedOff(LED_2);
@@ -344,7 +344,7 @@ void ProcessTask(void *pvParameter){
                 break;
             } /* End switch record_state*/
             #else
-                printf("Falta implementar el modelo para inferencia \r\n");
+                printf("Falta implementar el modelo para inferencia \n");
             #endif
             break; /* Fin del modo Inferencia */
         } /* Fin de switch(state) */ 
@@ -399,7 +399,7 @@ void app_main(void){
     static neopixel_color_t color;
 	NeoPixelInit(BUILT_IN_RGB_LED_PIN, BUILT_IN_RGB_LED_LENGTH, &color);
     NeoPixelAllColor(NEOPIXEL_COLOR_GREEN);
-	printf("Inicio Firmware SAPS");
+	printf("Inicio Firmware SAPS\n");
 
     /* Creación de tareas */
     xTaskCreate(ProcessTask, "Process", 4096, NULL, 5, &process_task_handle);
