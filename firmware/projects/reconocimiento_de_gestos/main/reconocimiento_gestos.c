@@ -63,7 +63,7 @@ linea para agregar filtrado digital a las señales */
 #define NUM_AXES		3                   /**< @brief Número de ejes */
 #define REFRACT_TIME	1500                /**< @brief Periodo refractario */
 #define NUM_SAMPLES 	(uint16_t)(TIME_SAMPLE*SAMPLE_FREC) /**< @brief Cantidad de muestras */
-#define ACCEL_THRESHOLD	1.5                 /**< @brief Umbral inicio de movimiento */
+#define ACCEL_THRESHOLD	1.7                 /**< @brief Umbral inicio de movimiento */
 
 /** @brief Enumeraciones de la máquina de estado principal */
 typedef enum state {
