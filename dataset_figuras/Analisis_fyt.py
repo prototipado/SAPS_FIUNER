@@ -1,60 +1,109 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.fftpack import fft
+from scipy import fft
 import process_data
 
-# Parámetros clave
-fs = 500  # Frecuencia de muestreo real (ajusta esto según tus datos!)
-T = 3
-N = fs*T
-
-folder="dataset_clases"
-# Cargar los datos usando tu función (asumiendo que ya está definida)
-x_axis, y_axis, z_axis, classmap =process_data.process_data(fs, T, folder)  # Reemplaza "cargar_datos()" con tu función
-
-# Seleccionar una medición (ej: primera fila) y extraer datos sin la etiqueta
-capture_idx = 0  # Índice de la medición a analizar
-x_signal = x_axis[capture_idx, :-1]  # Excluir la última columna (etiqueta)
-y_signal = y_axis[capture_idx, :-1]
-z_signal = z_axis[capture_idx, :-1]
+fs = 500  #frecuencia de muestreo del sensor
+ts=1/fs #tiempo entre muestras
+T = 3 #tiempo de muestreo
+N = fs*T #numero de muestras en la medicion
+SENS = 0.3 #sensibilidad
+OFF = 1.65 #offset
+N_half = N // 2  # Mitad de los puntos (solo positivos)
+medicion = 1
 
 
+folder="dataset_clases" #nombre del directorio donde estan los datasets
 
-# Preprocesamiento: Eliminar DC y aplicar ventana de Hanning
-x_signal = x_signal - np.mean(x_signal)
-y_signal = y_signal - np.mean(y_signal)
-z_signal = z_signal - np.mean(z_signal)
-window = np.hanning(N)
-x_signal = x_signal * window
-y_signal = y_signal * window
-z_signal = z_signal * window
+# Carga de datos
+x, y, z, classmap =process_data.process_data(fs, T, folder)
+fig, axes = plt.subplots(len(classmap), 3, figsize=(30, 20))
+fig.subplots_adjust(hspace=0.5)
 
-# Calcular FFT
-xf = np.linspace(0.0, fs/2, N//2)  # Eje de frecuencias (0 a Nyquist)
-yf_x = 2.0/N * np.abs(fft(x_signal))[:N//2]  # <-- Paréntesis cerrado después de fft(x_signal)
-yf_y = 2.0/N * np.abs(fft(y_signal))[:N//2]  # <-- Misma corrección aquí
-yf_z = 2.0/N * np.abs(fft(z_signal))[:N//2]  # <-- Y aquí
+#%%   FFT
 
-# Graficar
-plt.figure(figsize=(12, 8))
+#se recorre cada gesto
+for gesture_name in classmap:      
+                         
+    # Se recorre cada renglón de las matrices
+    for capture in range(int(len(x))):
+        
+        # Si en el último elemento se detecta la etiqueta correspondiente
+        if (x[capture, N] == gesture_name):
+            
+            # Cálculo y graficación de la FFT
+            
+            freq = fft.fftfreq(N, ts)[:N_half]  #Solo frecuencias positivas
+            # FFT de la señal en X
+            x_f = (fft.fft(x[capture, 0:N]) * SENS) + OFF 
+            
+            # FFT de la señal en Y
+            y_f = (fft.fft(y[capture, 0:N]) * SENS) + OFF 
+            
+            # FFT de la señal en Z
+            # Recorro el renglon correspondiente al valor de capture, desde 0 hasta N-1. Esto me da un subarreglo
+            # que se corresponde a la fila de capture y a las primeras N columnas de la matriz.
+            # Además ya hago la conversión de [G] a [V]
+            z_f = (fft.fft(z[capture, 0:N]) * SENS) + OFF 
+            
+            # Como la transformada de fourier genera un espectro simetrico, se considera solamente la mitad y graficamos
+            #desde 0 hasta nyquist, tambien como consideramos la mitad para mantener la relacion de parseval debemos multiplicar
+            #por 2  la amplitud de la FFT, tambien debo dividir por N para normalizar la senial
+            
+            x_f_mod = (2 / N) * np.abs(x_f[:N_half])  
+            y_f_mod = (2 / N) * np.abs(y_f[:N_half])  
+            z_f_mod = (2 / N) * np.abs(z_f[:N_half])
 
-plt.subplot(3, 1, 1)
-plt.plot(xf, yf_x, color='r')
-plt.title('Espectro de Frecuencia - Eje X')
-plt.xlabel('Frecuencia (Hz)')
-plt.ylabel('Amplitud')
+#%% Graficacion
+            
+            axes[gesture_name][0].plot(freq, x_f_mod, label="Medicion {}".format(medicion)) #graficacion eje x
+            axes[gesture_name][1].plot(freq, y_f_mod, label="Medicion {}".format(medicion)) #graficacion eje y
+            axes[gesture_name][2].plot(freq, z_f_mod, label="Medicion {}".format(medicion))#graficacion eje z 
 
-plt.subplot(3, 1, 2)
-plt.plot(xf, yf_y, color='g')
-plt.title('Espectro de Frecuencia - Eje Y')
-plt.xlabel('Frecuencia (Hz)')
-plt.ylabel('Amplitud')
+           
+            medicion = medicion+1 #paso a la siguiente medicion
+            if medicion==22:
+                 medicion=1
 
-plt.subplot(3, 1, 3)
-plt.plot(xf, yf_z, color='b')
-plt.title('Espectro de Frecuencia - Eje Z')
-plt.xlabel('Frecuencia (Hz)')
-plt.ylabel('Amplitud')
 
+     
+
+        axes[gesture_name][0].set_title(classmap[gesture_name] + " (Frecuencia X)")
+        axes[gesture_name][0].grid() 
+        axes[gesture_name][0].legend(fontsize=8, loc='upper right')
+        axes[gesture_name][0].set_xlabel('Frecuencia [Hz]', fontsize=10)
+        axes[gesture_name][0].set_ylabel('Magnitud', fontsize=10)
+
+        axes[gesture_name][1].set_title(classmap[gesture_name] + " (Frecuencia Y)")
+        axes[gesture_name][1].grid() 
+        axes[gesture_name][1].legend(fontsize=8, loc='upper right')
+        axes[gesture_name][1].set_xlabel('Frecuencia [Hz]', fontsize=10)
+        axes[gesture_name][1].set_ylabel('Magnitud', fontsize=10)
+
+        axes[gesture_name][2].set_title(classmap[gesture_name] + " (Frecuencia Z)")
+        axes[gesture_name][2].grid() 
+        axes[gesture_name][2].legend(fontsize=8, loc='upper right')
+        axes[gesture_name][2].set_xlabel('Frecuencia [Hz]', fontsize=10)
+        axes[gesture_name][2].set_ylabel('Magnitud', fontsize=10)
+
+        
+            #Se establecen limites en el eje x para observar frecuencias hasta los 20 Hz
+        axes[gesture_name][0].set_xlim(0, 90)
+        axes[gesture_name][1].set_xlim(0, 90)
+        axes[gesture_name][2].set_xlim(0, 90)
+
+#Se muestra el gráfico
 plt.tight_layout()
 plt.show()
+
+#%% Filtros
+
+#a partir de ver las graficas puedo determinar que el ancho de banda de interes
+
+Ab=30
+
+#defino la fm de la banda de interes como 4 veces la AB
+
+fm_interes = 4 * Ab
+
+#defino la frecuencia de corte como la fm de la banda de interes
