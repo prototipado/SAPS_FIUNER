@@ -1,4 +1,4 @@
-#include "Classifier.h"
+#include "classifier.h"
 
 /**
 * Predict class for features vector
