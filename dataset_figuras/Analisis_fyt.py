@@ -54,7 +54,7 @@ for gesture_name in classmap:
             y_f_mod = (2 / N) * np.abs(y_f[:N_half])  
             z_f_mod = (2 / N) * np.abs(z_f[:N_half])
 
-#%% Graficacion
+# Graficacion
             
             axes[gesture_name][0].plot(freq, x_f_mod, label="Medicion {}".format(medicion)) #graficacion eje x
             axes[gesture_name][1].plot(freq, y_f_mod, label="Medicion {}".format(medicion)) #graficacion eje y
