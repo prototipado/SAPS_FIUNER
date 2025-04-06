@@ -1,235 +1,261 @@
 # -*- coding: utf-8 -*-
 
 """
-
 Sistemas de Adquisición y Procesamiento de Señales
 Facultad de Ingeniería - UNER
 
 Filtrado Analógico:
-    En el siguiente script se ejemplifica el proceso de análisis de señales 
-    para la definición de requisitos para un filtro antialiasing.
-    También se ejemplifica la importación de los resultados del diseño de filtros
-    utilizando Analog Filter Wizard y de simulaciones realizadas mediante
-    LTSpice.
+    Ejemplo de análisis para diseño de filtro antialiasing.
+    Incluye importación de diseños de Analog Filter Wizard y simulaciones de LTSpice.
 
 Autor: Albano Peñalva
 Fecha: Febrero 2025
-
 """
 
-# Librerías
-from scipy import signal
-from scipy import fft
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import fft, signal
 import process_data
 from import_ltspice import import_AC_LTSpice
 from import_analogfilterwizard import import_AnalogFilterWizard
-from funciones_fft import fft_mag
 
-plt.close('all') # cerrar gráficas anteriores
+plt.close('all')
 
-#%% Lectura del dataset
+#%% Configuración inicial y lectura de datos
 
-FS = 500 # Frecuencia de muestre: 500Hz
-T = 3    # Tiempo total de cada registro: 2 segundos
 
-folder = 'dataset_clases' # Carpeta donde se almacenan los .csv
+FS = 500  # Frecuencia de muestreo original [Hz]
+T = 3     # Duración de cada registro [s]
+N = FS * T   #cantidad de muestras
+ts = 1 / FS  #tiempo entre muestras
+t = np.linspace(0, N*ts, N) #vector de muestras para poder representar la senial en temporal
+N_half = N // 2  #mitad de la cantidad de muestras
+freq = fft.fftfreq(N, ts)[:N_half]  #vector de frecuencias
 
-x, y, z, classmap = process_data.process_data(FS, T, folder)
-print("\r")
+# Parámetros del sensor
+SENS = 300  # Sensibilidad [mV/g]
+OFF = 1650   # Offset [mV]
 
-ts = 1 / FS                     # tiempo de muestreo
-N = FS*T                        # número de muestras en cada regsitro
-t = np.linspace(0, N * ts, N)   # vector de tiempos
-N_half = N // 2  # Mitad de los puntos (solo positivos)
-medicion = 1    # Contador para la graficacion
-# Análisis frecuencial de las señales
+# Lectura de datos
+folder = 'dataset_clases'
+x, y, z, classmap = process_data.process_data(FS, T, folder)  #se cargan las seniales
+n_gestures = len(classmap) #cantidad de gestos
 
-SENS = 300      # Sensibilidad del ADXL335 [mV/g]
-OFF  = 1650     # Offset del ADXL335 [mV]
+#%% Preprocesamiento y cálculo de FFTs
 
-#%%   FFT
-fig, axes = plt.subplots(len(classmap), 3, figsize=(30, 20))
+# Estructura para almacenar todas las FFTs
+fft_data = {  #diccionario de diccionarios donde se van a almacenar los valores de la fft
+    gesture: {'x': [], 'y': [], 'z': []}  #clave-valor clave numero de gesto, valor  diccionario con 3 claves x,y,z. para el gesto0 se crea una lista para el eje x que contiene vectores con la fft para la primer medicion, segunda y asi 
+    for gesture in range(n_gestures)     #range genera numeros desde 0 hasta N-1 gestos 
+}
+
+# Cálculo de todas las FFTs
+for capture in range(len(x)):
+    gesture = int(x[capture, N])  #la última columna tiene la etiqueta del gesto
+    
+    # Cálculo de FFTs y conversion de G a V
+    x_fft = (2/N) * np.abs(fft.fft((x[capture, :N]) * SENS + OFF))[:N_half]
+    y_fft = (2/N) * np.abs(fft.fft((y[capture, :N]) * SENS + OFF))[:N_half]
+    z_fft = (2/N) * np.abs(fft.fft((z[capture, :N]) * SENS + OFF))[:N_half]
+    
+    # Almacenamiento
+    fft_data[gesture]['x'].append(x_fft) #gesture lo saco de la ultima columna de la medicion
+    fft_data[gesture]['y'].append(y_fft)
+    fft_data[gesture]['z'].append(z_fft)
+
+#%% Graficación de FFTs
+
+fig, axes = plt.subplots(n_gestures, 3, figsize=(30, 20))
 fig.subplots_adjust(hspace=0.5)
 
-#se recorre cada gesto
-for gesture_name in classmap:      
-                         
-    # Se recorre cada renglón de las matrices
-    for capture in range(int(len(x))):
-        
-        # Si en el último elemento se detecta la etiqueta correspondiente
-        if (x[capture, N] == gesture_name):
-            
-            # Cálculo y graficación de la FFT
-            
-            freq = fft.fftfreq(N, ts)[:N_half]  #Solo frecuencias positivas
-            # FFT de la señal en X
-            x_f = (fft.fft(x[capture, 0:N]) * SENS) + OFF 
-            
-            # FFT de la señal en Y
-            y_f = (fft.fft(y[capture, 0:N]) * SENS) + OFF 
-            
-            # FFT de la señal en Z
-            # Recorro el renglon correspondiente al valor de capture, desde 0 hasta N-1. Esto me da un subarreglo
-            # que se corresponde a la fila de capture y a las primeras N columnas de la matriz.
-            # Además ya hago la conversión de [G] a [V]
-            z_f = (fft.fft(z[capture, 0:N]) * SENS) + OFF 
-            
-            # Como la transformada de fourier genera un espectro simetrico, se considera solamente la mitad y graficamos
-            #desde 0 hasta nyquist, tambien como consideramos la mitad para mantener la relacion de parseval debemos multiplicar
-            #por 2  la amplitud de la FFT, tambien debo dividir por N para normalizar la senial
-            
-            x_f_mod = (2 / N) * np.abs(x_f[:N_half])  
-            y_f_mod = (2 / N) * np.abs(y_f[:N_half])  
-            z_f_mod = (2 / N) * np.abs(z_f[:N_half])
+for gesture in range(n_gestures):
+    # Eje X
+    for fft_x in fft_data[gesture]['x']:
+        axes[gesture, 0].plot(freq, fft_x, alpha=0.5, linewidth=0.8)
+    axes[gesture, 0].set_title(f"{classmap[gesture]} - Eje X", fontsize=10)
+    axes[gesture, 0].set_xlim(0, 90)
+    axes[gesture, 0].grid(True, alpha=0.3)
+    axes[gesture, 0].set_ylabel('Amplitud [mV]', fontsize=8)
 
-# Graficacion de la FFT
-            
-            axes[gesture_name][0].plot(freq, x_f_mod, label="Medicion {}".format(medicion)) #graficacion eje x
-            axes[gesture_name][1].plot(freq, y_f_mod, label="Medicion {}".format(medicion)) #graficacion eje y
-            axes[gesture_name][2].plot(freq, z_f_mod, label="Medicion {}".format(medicion))#graficacion eje z 
+    # Eje Y
+    for fft_y in fft_data[gesture]['y']:
+        axes[gesture, 1].plot(freq, fft_y, alpha=0.5, linewidth=0.8)
+    axes[gesture, 1].set_title(f"{classmap[gesture]} - Eje Y", fontsize=10)
+    axes[gesture, 1].set_xlim(0, 90)
+    axes[gesture, 1].grid(True, alpha=0.3)
 
-           
-            medicion = medicion+1 #paso a la siguiente medicion
-            if medicion==22:
-                 medicion=1
+    # Eje Z
+    for fft_z in fft_data[gesture]['z']:
+        axes[gesture, 2].plot(freq, fft_z, alpha=0.5, linewidth=0.8)
+    axes[gesture, 2].set_title(f"{classmap[gesture]} - Eje Z", fontsize=10)
+    axes[gesture, 2].set_xlim(0, 90)
+    axes[gesture, 2].grid(True, alpha=0.3)
+    axes[gesture, 2].set_xlabel('Frecuencia [Hz]', fontsize=8)
 
-
-     
-
-        axes[gesture_name][0].set_title(classmap[gesture_name] + " (Frecuencia X)")
-        axes[gesture_name][0].grid() 
-        axes[gesture_name][0].legend(fontsize=8, loc='upper right')
-        axes[gesture_name][0].set_xlabel('Frecuencia [Hz]', fontsize=10)
-        axes[gesture_name][0].set_ylabel('Magnitud', fontsize=10)
-
-        axes[gesture_name][1].set_title(classmap[gesture_name] + " (Frecuencia Y)")
-        axes[gesture_name][1].grid() 
-        axes[gesture_name][1].legend(fontsize=8, loc='upper right')
-        axes[gesture_name][1].set_xlabel('Frecuencia [Hz]', fontsize=10)
-        axes[gesture_name][1].set_ylabel('Magnitud', fontsize=10)
-
-        axes[gesture_name][2].set_title(classmap[gesture_name] + " (Frecuencia Z)")
-        axes[gesture_name][2].grid() 
-        axes[gesture_name][2].legend(fontsize=8, loc='upper right')
-        axes[gesture_name][2].set_xlabel('Frecuencia [Hz]', fontsize=10)
-        axes[gesture_name][2].set_ylabel('Magnitud', fontsize=10)
-
-        
-            #Se establecen limites en el eje x para observar frecuencias hasta los 20 Hz
-        axes[gesture_name][0].set_xlim(0, 90)
-        axes[gesture_name][1].set_xlim(0, 90)
-        axes[gesture_name][2].set_xlim(0, 90)
-
-#Se muestra el gráfico
 plt.tight_layout()
 plt.show()
 
+#%% Análisis para filtro antialiasing
+AB=20
+FS2 = AB * 3  # Nueva frecuencia de muestreo
+nyquist_nuevo = FS2 / 2
+idx_nyquist = np.abs(freq - nyquist_nuevo).argmin()
 
-#%%
-# Se propone una nueva frecuencia de muestreo para el sistema
-FS2 = 90                                    # Nueva frecuencia de muestreo: 60Hz
-fs2_2 = freq[np.where(freq>=(FS2/2))][0]          # Valor más cercano a FS2/2
+# Matrices de resultados
+resultados = {
+    'max_amplitudes': np.zeros((n_gestures, 3)),
+    'frecuencias_max': np.zeros((n_gestures, 3)),
+    'amplitudes_nyquist': np.zeros((n_gestures, 3))
+}
 
-# Para determinar los requerimientos del antialiasing, primero analizamos el 
-# contenido espectral de las señales por encima de FS2/2 en dos puntos (peores casos):
-h_max_max=0 
-f_max_max=0 
-#se recorre cada gesto
-for gesture_name in classmap:      
-                         
-    # Se recorre cada renglón de las matrices
-    for capture in range(int(len(x))):
+for gesture in range(n_gestures):
+    for i, axis in enumerate(['x', 'y', 'z']):
+        # Inicializar valores
+        max_amp = 0
+        freq_max = 0
+        amp_nyquist = 0
         
-        # Si en el último elemento se detecta la etiqueta correspondiente
-        if (x[capture, N] == gesture_name):    
-            # Donde se encuentre el máximo a partir de FS2/2
-            hx_max = np.max( x_f_mod [np.where(x_f_mod >= fs2_2) ] )
-            hy_max = np.max( y_f_mod [np.where(y_f_mod >= fs2_2) ] )
-            hz_max = np.max( z_f_mod [np.where(z_f_mod >= fs2_2) ] )
-
-            fx_max = freq[ np.argmax(x_f_mod[np.where(freq >= fs2_2)])] + fs2_2
-            fy_max = freq[ np.argmax(y_f_mod[np.where(freq >= fs2_2)])] + fs2_2
-            fz_max = freq[ np.argmax(z_f_mod[np.where(freq >= fs2_2)])] + fs2_2
+        # Analizar cada captura
+        for fft_axis in fft_data[gesture][axis]:
+            # Máxima amplitud sobre nyquist_nuevo
+            mascara = freq >= nyquist_nuevo
+            if np.any(mascara):
+                amp_actual = np.max(fft_axis[mascara])
+                if amp_actual > max_amp:
+                    max_amp = amp_actual
+                    freq_max = freq[mascara][np.argmax(fft_axis[mascara])]
             
-            if(hx_max>=h_max_max):
-                h_max_max=hx_max
-                f_max_max=fx_max
-            if(hy_max>=h_max_max):
-                h_max_max=hy_max
-                f_max_max=fy_max
-            if(hz_max>=h_max_max):
-                h_max_max=hz_max
-                f_max_max=fz_max
-# Exactamente en FS2/2
-    h_fs_2 = np.max( x_f_mod [np.where(freq == fs2_2) ] )
-    f_fs_2 = freq[ np.argmax( h[ np.where(freq == fs2_2) ] ) ] + fs2_2
+            # Amplitud en nyquist_nuevo
+            amp_actual_nyq = fft_axis[idx_nyquist]
+            if amp_actual_nyq > amp_nyquist:
+                amp_nyquist = amp_actual_nyq
+        
+        # Almacenar resultados
+        resultados['max_amplitudes'][gesture, i] = max_amp
+        resultados['frecuencias_max'][gesture, i] = freq_max
+        resultados['amplitudes_nyquist'][gesture, i] = amp_nyquist
 
-print(f"Interferencia de {h_max:.2f}mV en {f_max}Hz")
-print(f"Interferencia de {h_fs_2:.2f}mV en {f_fs_2}Hz")
-print("\r")
+#%% Visualización de resultados
+print("\nResultados del análisis para filtrado:")
+for gesture in range(n_gestures):
+    print(f"\nGesto: {classmap[gesture]}")
+    print("Máximas amplitudes sobre {} Hz:".format(nyquist_nuevo))
+    print("X: {:.2f} mV @ {:.1f} Hz".format(
+        resultados['max_amplitudes'][gesture, 0],
+        resultados['frecuencias_max'][gesture, 0]))
+    print("Y: {:.2f} mV @ {:.1f} Hz".format(
+        resultados['max_amplitudes'][gesture, 1],
+        resultados['frecuencias_max'][gesture, 1]))
+    print("Z: {:.2f} mV @ {:.1f} Hz".format(
+        resultados['max_amplitudes'][gesture, 2],
+        resultados['frecuencias_max'][gesture, 2]))
+    
+    print("\nAmplitudes en {} Hz:".format(nyquist_nuevo))
+    print("X: {:.2f} mV".format(resultados['amplitudes_nyquist'][gesture, 0]))
+    print("Y: {:.2f} mV".format(resultados['amplitudes_nyquist'][gesture, 1]))
+    print("Z: {:.2f} mV\n".format(resultados['amplitudes_nyquist'][gesture, 2]))
 
-ax2.axvline(x=FS2/2, color="black", linestyle="--")
-ax2.plot(f_max, h_max, marker='X', markersize=12, label='Amplitud en fs/2')
-ax2.plot(f_fs_2, h_fs_2, marker='X', markersize=12, label='Máximo a partir de fs/2')
-ax2.legend(loc='upper right');
-
-#%% Determinar requerimienos del filtro antialiasing
-
-# Parámetros ADC:
+#%% Parámetros del ADC y cálculos de atenuación
 V_REF = 3300        # Tensión de referencia en mV
 N_BITS = 12         # Resolución en bits
+RES = V_REF / (2**N_BITS - 1)  # Resolución en mV
 
-RES = V_REF/(2**N_BITS - 1)     # Resolución en mV
+# Encontrar los peores casos de atenuación requerida
+max_at = {
+    'at_max': {'value': -np.inf, 'freq': 0, 'gesture': None, 'axis': None},
+    'at_fs2': {'value': -np.inf, 'freq': 0, 'gesture': None, 'axis': None}
+}
 
-# Atenuaciones necesarias 
-at_max = 20*np.log10(h_max/RES) 
-at_fs2_2 = 20*np.log10(h_fs_2/RES)
+for gesture in range(n_gestures):
+    for i, axis in enumerate(['x', 'y', 'z']):
+        # Calcular atenuaciones requeridas
+        h_max = resultados['max_amplitudes'][gesture, i]
+        h_fs2 = resultados['amplitudes_nyquist'][gesture, i]
+        f_max = resultados['frecuencias_max'][gesture, i]
+        
+        at_max = 20 * np.log10(h_max / RES) if h_max > 0 else -np.inf
+        at_fs2 = 20 * np.log10(h_fs2 / RES) if h_fs2 > 0 else -np.inf
+        
+        # Actualizar peores casos
+        if at_max > max_at['at_max']['value']:
+            max_at['at_max'].update({
+                'value': at_max,
+                'freq': f_max,
+                'gesture': classmap[gesture],
+                'axis': axis.upper()
+            })
+            
+        if at_fs2 > max_at['at_fs2']['value']:
+            max_at['at_fs2'].update({
+                'value': at_fs2,
+                'freq': FS2/2,
+                'gesture': classmap[gesture],
+                'axis': axis.upper()
+            })
 
-print("Banda de paso hasta 25Hz")   # Banda de paso determinada en guía 1
-print(f"Atenuación mayor a {at_max:.2f}dB en {f_max}Hz")
-print(f"Atenuación mayor a {at_fs2_2:.2f}dB en {f_fs_2}Hz")
-print("\r")
+# Mostrar requisitos
+print("\nRequisitos de atenuación (peores casos):")
+print(f"Banda de paso hasta {FS2/3} Hz")
+print(f"Atenuación requerida en {max_at['at_max']['freq']:.1f} Hz: " +
+      f"{max_at['at_max']['value']:.2f} dB " +
+      f"(Gesto: {max_at['at_max']['gesture']}, Eje: {max_at['at_max']['axis']})")
+      
+print(f"Atenuación requerida en {FS2/2} Hz: " +
+      f"{max_at['at_fs2']['value']:.2f} dB " +
+      f"(Gesto: {max_at['at_fs2']['gesture']}, Eje: {max_at['at_fs2']['axis']})")
 
-#%% Importar resultados de Diseño de Analog Filter Wizard
-f, mag = import_AnalogFilterWizard('DesignFiles/Data Files/Magnitude(dB).csv')
+#%% Importación de respuestas de filtros
+# Diseño de Analog Filter Wizard
+f_diseño, mag_diseño = import_AnalogFilterWizard('DesignFiles/Data Files/Magnitude(dB).csv')
 
-
-#%% Importar resultados de simulación en LTSpice
+# Simulación LTSpice
 f_sim, mag_sim, _ = import_AC_LTSpice('DesignFiles/SPICE Files/LTspice/ACAnalysis.txt')
 
-# Análisis de la atenuación del filtro simulado en las frecuencias de interés
-F_AT1 = FS2/2
-F_AT2 = f_max
-# se calcula la atenuación en el punto mas cercano a la frecuencia de interés
-at1 = mag_sim[np.argmin(np.abs(f_sim-F_AT1))] 
-print("La atenuación del filtro simulado en {}Hz es de {:.2f}dB".format(F_AT1, at1))
-at2 = mag_sim[np.argmin(np.abs(f_sim-F_AT2))] 
-print("La atenuación del filtro simulado en {}Hz es de {:.2f}dB".format(F_AT2, at2))
-print("\r")
-
-#%% Comparación de las respuestas en frecuencia del filtro diseñado y el simulado 
-
-# Se crea una gráfica para comparar los filtros 
-fig3, ax3 = plt.subplots(1, 1, figsize=(12, 10))
-
-ax3.set_title('Filtro orden 4', fontsize=18)
-ax3.set_xlabel('Frecuencia [Hz]', fontsize=15)
-ax3.set_ylabel('|H(jw)|² [dB]', fontsize=15)
-ax3.set_xscale('log')
-ax3.grid(True, which="both")
-ax3.plot(f,  mag, label='Diseñado')
-ax3.plot(f_sim,  mag_sim, label='Simulado')
-ax3.plot(f_fs_2, -at_fs2_2, marker='X', markersize=12, label='Requisito en fs/2')
-ax3.plot(f_max, -at_max, marker='X', markersize=12, label='Requisito en máximo a partir de fs/2')
-ax3.legend(loc="lower left", fontsize=15)
-
-#%% Comparación con la respuestas en frecuencia del filtro implementado
-
+# Implementación real (datos de ejemplo)
 f_impl = [1, 2, 5, 10, 11, 12, 15, 20, 21, 22, 25, 50, 100, 200, 500]
 mag_impl = [0.0, 0.5, 1.5, 2.0, 1.5, 1.0, 0.0, 1.5, 2.0, 1.5, 0.0, -30, -60, -80, -90]
-ax3.plot(f_impl,  mag_impl, label='Implementado')
 
+#%% Análisis comparativo de filtros
+fig, ax = plt.subplots(figsize=(14, 8))
+ax.set_title('Comparación de respuestas de filtro', fontsize=14)
+ax.set_xlabel('Frecuencia [Hz]', fontsize=12)
+ax.set_ylabel('Atenuación [dB]', fontsize=12)
+ax.set_xscale('log')
+ax.grid(True, which='both', linestyle='--', alpha=0.6)
+
+# Graficar todas las respuestas
+ax.plot(f_diseño, mag_diseño, label='Diseño teórico', linewidth=2)
+ax.plot(f_sim, mag_sim, label='Simulación LTSpice', linestyle='--')
+ax.plot(f_impl, mag_impl, label='Implementación real', marker='o', markersize=6)
+
+# Marcar requisitos
+ax.axvline(FS2/2, color='purple', linestyle=':', 
+          label=f'Nyquist nuevo ({FS2/2} Hz)')
+ax.plot(max_at['at_max']['freq'], -max_at['at_max']['value'], 'rx', 
+       markersize=10, label='Requisito máximo')
+ax.plot(FS2/2, -max_at['at_fs2']['value'], 'r+', markersize=15, 
+       label='Requisito en Nyquist')
+
+ax.legend(loc='lower left', fontsize=10)
+plt.tight_layout()
 plt.show()
+
+#%% Análisis de margen de seguridad
+def encontrar_atenuacion(frecuencias, respuesta, f_obj):
+    idx = np.abs(frecuencias - f_obj).argmin()
+    return respuesta[idx]
+
+print("\nAtenuación obtenida vs requerida:")
+for caso in ['at_max', 'at_fs2']:
+    f_obj = max_at[caso]['freq']
+    req = -max_at[caso]['value']
+    
+    at_diseño = encontrar_atenuacion(f_diseño, mag_diseño, f_obj)
+    at_sim = encontrar_atenuacion(f_sim, mag_sim, f_obj)
+    at_impl = encontrar_atenuacion(f_impl, mag_impl, f_obj)
+    
+    print(f"\nEn {f_obj:.1f} Hz:")
+    print(f"- Requerido: {req:.2f} dB")
+    print(f"- Diseño: {at_diseño:.2f} dB | Margen: {at_diseño - req:.2f} dB")
+    print(f"- Simulación: {at_sim:.2f} dB | Margen: {at_sim - req:.2f} dB")
+    print(f"- Implementación: {at_impl:.2f} dB | Margen: {at_impl - req:.2f} dB")
