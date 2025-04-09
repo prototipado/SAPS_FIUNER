@@ -19,7 +19,7 @@ import process_data
 from import_ltspice import import_AC_LTSpice
 from import_analogfilterwizard import import_AnalogFilterWizard
 
-plt.close('all')
+plt.close('all') #ciero plots si hay abierto alguno
 
 #%% Configuración inicial y lectura de datos
 
@@ -70,7 +70,7 @@ fig.subplots_adjust(hspace=0.5)
 
 for gesture in range(n_gestures):
     # Eje X
-    for fft_x in fft_data[gesture]['x']:
+    for fft_x in fft_data[gesture]['x']:  #aqui es donde se itera sobre las mediciones en el ejex dando las diferentes capturas
         axes[gesture, 0].plot(freq, fft_x, alpha=0.5, linewidth=0.8)
     axes[gesture, 0].set_title(f"{classmap[gesture]} - Eje X", fontsize=10)
     axes[gesture, 0].set_xlim(0, 90)
@@ -96,35 +96,37 @@ plt.tight_layout()
 plt.show()
 
 #%% Análisis para filtro antialiasing
-AB=20
-FS2 = AB * 3  # Nueva frecuencia de muestreo
-nyquist_nuevo = FS2 / 2
-idx_nyquist = np.abs(freq - nyquist_nuevo).argmin()
-
+AB=20 #definimos nuestro ancho de banda segun las graficas
+FS2 = AB * 3  # Nueva frecuencia de muestreo, lo multiplicamos por 3 y no por 2 porque en la vida real los filtros no son ideales y multiplicarlo por 3 me da una tolerancia
+nyquist_nuevo = FS2 / 2 
+idx_nyquist = np.abs(freq - nyquist_nuevo).argmin() #se encuentra el valor de nyquist mas cercano en el vector de freq
+                                                    #primero se calculan las diferencias, se le aplica valor absoluto y luego se encuentra el minimo de las diferencias 
+                                                    #esto es un indice que posteriormente lo uso para obtener la amplitud en la freq nyquist
 # Matrices de resultados
-resultados = {
+resultados = {  #diccionario de matrices 
     'max_amplitudes': np.zeros((n_gestures, 3)),
     'frecuencias_max': np.zeros((n_gestures, 3)),
     'amplitudes_nyquist': np.zeros((n_gestures, 3))
 }
 
 for gesture in range(n_gestures):
-    for i, axis in enumerate(['x', 'y', 'z']):
+    for i, axis in enumerate(['x', 'y', 'z']):  #este bucle devuelve pares indices y elemento entonces la primera iteracion es x, la segunda y y la tercera z
+       
         # Inicializar valores
         max_amp = 0
         freq_max = 0
         amp_nyquist = 0
         
         # Analizar cada captura
-        for fft_axis in fft_data[gesture][axis]:
-            # Máxima amplitud sobre nyquist_nuevo
-            mascara = freq >= nyquist_nuevo
-            if np.any(mascara):
-                amp_actual = np.max(fft_axis[mascara])
-                if amp_actual > max_amp:
-                    max_amp = amp_actual
-                    freq_max = freq[mascara][np.argmax(fft_axis[mascara])]
-            
+        for fft_axis in fft_data[gesture][axis]:  #se recorren los valores de la fft para cada eje dentro de cada gesto
+            # se busca la máxima amplitud sobre nyquist_nuevo
+            mascara = freq >= nyquist_nuevo #array booleano que devuelve positivo si la freq esta por encima de FS2_2
+            if np.any(mascara): #se verifica si existe alguna frecuencia sobre el nyquist
+                amp_actual = np.max(fft_axis[mascara]) #encuentra el valor maximo de amplitud en los valores donde la mascara es verdadera
+                if amp_actual > max_amp: #si el maximo de la captura actual es mayor que la maxima amplitud registrada hasta el momento
+                    max_amp = amp_actual #se asigna el maximo actual como el nuevo maximo de todas las capturas
+                    freq_max = freq[mascara][np.argmax(fft_axis[mascara])] #se encuentra la maxima frecuencia para la mayor amplitud
+                                                                            #np.argmax busca el valor de maxima amplitud en fft_axis y lo devuelve como indice
             # Amplitud en nyquist_nuevo
             amp_actual_nyq = fft_axis[idx_nyquist]
             if amp_actual_nyq > amp_nyquist:
@@ -161,20 +163,21 @@ N_BITS = 12         # Resolución en bits
 RES = V_REF / (2**N_BITS - 1)  # Resolución en mV
 
 # Encontrar los peores casos de atenuación requerida
-max_at = {
-    'at_max': {'value': -np.inf, 'freq': 0, 'gesture': None, 'axis': None},
-    'at_fs2': {'value': -np.inf, 'freq': 0, 'gesture': None, 'axis': None}
+max_at = {   #diccionario
+    'at_max': {'value': -np.inf, 'freq': 0, 'gesture': None, 'axis': None}, #value -np inf dice que el valor inicial es infinito negativo para asegurar que cualquier valor real lo supere 
+    'at_fs2': {'value': -np.inf, 'freq': 0, 'gesture': None, 'axis': None}#freq, gesture y axis estan inicializados en none para ser remplazados posteriormente 
 }
 
 for gesture in range(n_gestures):
     for i, axis in enumerate(['x', 'y', 'z']):
         # Calcular atenuaciones requeridas
-        h_max = resultados['max_amplitudes'][gesture, i]
+        h_max = resultados['max_amplitudes'][gesture, i] 
         h_fs2 = resultados['amplitudes_nyquist'][gesture, i]
         f_max = resultados['frecuencias_max'][gesture, i]
         
-        at_max = 20 * np.log10(h_max / RES) if h_max > 0 else -np.inf
-        at_fs2 = 20 * np.log10(h_fs2 / RES) if h_fs2 > 0 else -np.inf
+      
+        at_max = 20 * np.log10(h_max / RES) if h_max > 0 else -np.inf #primero pasamos a db
+        at_fs2 = 20 * np.log10(h_fs2 / RES) if h_fs2 > 0 else -np.inf #despues comparamos si las amplitudes son mayores a 0 para evitar errores matematicos si se da el caso de log entre 0 y 1
         
         # Actualizar peores casos
         if at_max > max_at['at_max']['value']:
@@ -204,58 +207,64 @@ print(f"Atenuación requerida en {FS2/2} Hz: " +
       f"{max_at['at_fs2']['value']:.2f} dB " +
       f"(Gesto: {max_at['at_fs2']['gesture']}, Eje: {max_at['at_fs2']['axis']})")
 
-#%% Importación de respuestas de filtros
-# Diseño de Analog Filter Wizard
-f_diseño, mag_diseño = import_AnalogFilterWizard('DesignFiles/Data Files/Magnitude(dB).csv')
+#%% Importar resultados de Diseño de Analog Filter Wizard
+f, mag = import_AnalogFilterWizard('C:/Repositorio/SAPS_Gonzalez_C1_2025/DesignFiles/Data Files/Magnitude(dB).csv')
 
-# Simulación LTSpice
-f_sim, mag_sim, _ = import_AC_LTSpice('DesignFiles/SPICE Files/LTspice/ACAnalysis.txt')
 
-# Implementación real (datos de ejemplo)
-f_impl = [1, 2, 5, 10, 11, 12, 15, 20, 21, 22, 25, 50, 100, 200, 500]
-mag_impl = [0.0, 0.5, 1.5, 2.0, 1.5, 1.0, 0.0, 1.5, 2.0, 1.5, 0.0, -30, -60, -80, -90]
+#%% Importar resultados de simulación en LTSpice
+f_sim, mag_sim, _ = import_AC_LTSpice('C:/Repositorio/SAPS_Gonzalez_C1_2025/DesignFiles/Data Files/filtro.txt')
 
-#%% Análisis comparativo de filtros
-fig, ax = plt.subplots(figsize=(14, 8))
-ax.set_title('Comparación de respuestas de filtro', fontsize=14)
-ax.set_xlabel('Frecuencia [Hz]', fontsize=12)
-ax.set_ylabel('Atenuación [dB]', fontsize=12)
-ax.set_xscale('log')
-ax.grid(True, which='both', linestyle='--', alpha=0.6)
+# Análisis de la atenuación del filtro simulado en las frecuencias de interés
+F_AT1 = FS2/2
+F_AT2 = f_max
+# se calcula la atenuación en el punto mas cercano a la frecuencia de interés
+at1 = mag_sim[np.argmin(np.abs(f_sim-F_AT1))] 
+print("La atenuación del filtro simulado en {}Hz es de {:.2f}dB".format(F_AT1, at1))
+at2 = mag_sim[np.argmin(np.abs(f_sim-F_AT2))] 
+print("La atenuación del filtro simulado en {}Hz es de {:.2f}dB".format(F_AT2, at2))
+print("\r")
 
-# Graficar todas las respuestas
-ax.plot(f_diseño, mag_diseño, label='Diseño teórico', linewidth=2)
-ax.plot(f_sim, mag_sim, label='Simulación LTSpice', linestyle='--')
-ax.plot(f_impl, mag_impl, label='Implementación real', marker='o', markersize=6)
+#%% Comparación de las respuestas en frecuencia del filtro diseñado y el simulado 
 
-# Marcar requisitos
-ax.axvline(FS2/2, color='purple', linestyle=':', 
-          label=f'Nyquist nuevo ({FS2/2} Hz)')
-ax.plot(max_at['at_max']['freq'], -max_at['at_max']['value'], 'rx', 
-       markersize=10, label='Requisito máximo')
-ax.plot(FS2/2, -max_at['at_fs2']['value'], 'r+', markersize=15, 
-       label='Requisito en Nyquist')
+# Se crea una gráfica para comparar los filtros 
+fig3, ax3 = plt.subplots(1, 1, figsize=(12, 10))
 
-ax.legend(loc='lower left', fontsize=10)
-plt.tight_layout()
+ax3.set_title('Filtro orden 4', fontsize=18)
+ax3.set_xlabel('Frecuencia [Hz]', fontsize=15)
+ax3.set_ylabel('|H(jw)|² [dB]', fontsize=15)
+ax3.set_xscale('log')
+ax3.grid(True, which="both")
+ax3.plot(f,  mag, label='Diseñado')
+ax3.plot(f_sim,  mag_sim, label='Simulado')
+ax3.plot(FS2/2, -at_fs2, marker='X', markersize=12, label='Requisito en fs/2')
+ax3.plot(f_max, -at_max, marker='X', markersize=12, label='Requisito en máximo a partir de fs/2')
+ax3.legend(loc="lower left", fontsize=15)
+
+#%% Comparación con la respuestas en frecuencia del filtro implementado
+
+
+
+f_impl = [1, 5, 10, 12, 14, 16, 18, 20,22, 26, 30, 35, 40, 45,50,70,100,120,150,200]
+mag_impl = [0.09001002453,
+-0.9554556359,
+-3.658613672,
+-4.838170871,
+-6.390268027,
+-8.049752728,
+-9.818190784,
+-12.52490752,
+-14.11618858,
+-17.36655761,
+-20,
+-23.58995015,
+-26.58117439,
+-29.27514586,
+-31.86210297,
+-39.64542466,
+-48.76406377,
+-52.87629479,
+-56.97464649,
+-62.49877473]
+ax3.plot(f_impl,  mag_impl, label='Implementado')
+
 plt.show()
-
-#%% Análisis de margen de seguridad
-def encontrar_atenuacion(frecuencias, respuesta, f_obj):
-    idx = np.abs(frecuencias - f_obj).argmin()
-    return respuesta[idx]
-
-print("\nAtenuación obtenida vs requerida:")
-for caso in ['at_max', 'at_fs2']:
-    f_obj = max_at[caso]['freq']
-    req = -max_at[caso]['value']
-    
-    at_diseño = encontrar_atenuacion(f_diseño, mag_diseño, f_obj)
-    at_sim = encontrar_atenuacion(f_sim, mag_sim, f_obj)
-    at_impl = encontrar_atenuacion(f_impl, mag_impl, f_obj)
-    
-    print(f"\nEn {f_obj:.1f} Hz:")
-    print(f"- Requerido: {req:.2f} dB")
-    print(f"- Diseño: {at_diseño:.2f} dB | Margen: {at_diseño - req:.2f} dB")
-    print(f"- Simulación: {at_sim:.2f} dB | Margen: {at_sim - req:.2f} dB")
-    print(f"- Implementación: {at_impl:.2f} dB | Margen: {at_impl - req:.2f} dB")

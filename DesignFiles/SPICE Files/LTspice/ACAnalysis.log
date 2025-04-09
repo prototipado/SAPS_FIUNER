@@ -1,0 +1,58 @@
+LTspice 24.1.4 for Windows
+Circuit: C:\Repositorio\SAPS_Gonzalez_C1_2025\DesignFiles\SPICE Files\LTspice\ACAnalysis.net
+Start Time: Wed Apr  9 10:05:36 2025
+solver = Normal
+Maximum thread count: 12
+tnom = 27
+temp = 27
+method = trap
+Direct Newton iteration failed to find .op point.  (Use ".option noopiter" to skip.)
+Starting Gmin stepping
+Gmin = 10
+Gmin = 1.07374
+Gmin = 0.115292
+Gmin = 0.0123794
+Gmin = 0.00132923
+Gmin = 0.000142725
+Gmin = 1.5325e-05
+Gmin = 1.6455e-06
+Gmin = 1.76685e-07
+Gmin = 1.89714e-08
+vernier = 0.5
+vernier = 0.25
+vernier = 0.125
+vernier = 0.0625
+Gmin = 1.21417e-08
+vernier = 0.03125
+vernier = 0.0416667
+Gmin = 1.13208e-08
+vernier = 0.0555555
+vernier = 0.074074
+Gmin = 9.91896e-09
+vernier = 0.0987653
+Gmin = 8.01043e-09
+vernier = 0.131687
+vernier = 0.175583
+Gmin = 5.65832e-09
+vernier = 0.23411
+vernier = 0.312147
+Gmin = 3.27997e-09
+vernier = 0.416196
+Gmin = 1.37328e-09
+vernier = 0.554928
+vernier = 0.739903
+Gmin = 3.42858e-10
+vernier = 0.986537
+vernier = 1
+Gmin = 4.39179e-11
+Gmin = 4.71564e-12
+Gmin = 5.06338e-13
+Gmin = 0
+Gmin stepping succeeded in finding the operating point.
+
+Total elapsed time: 0.590 seconds.
+
+Files loaded:
+C:\Repositorio\SAPS_Gonzalez_C1_2025\DesignFiles\SPICE Files\LTspice\ACAnalysis.net
+C:\Users\alkas\AppData\Local\LTspice\lib\sub\LTC5.lib
+
