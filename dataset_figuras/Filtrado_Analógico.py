@@ -208,11 +208,11 @@ print(f"Atenuación requerida en {FS2/2} Hz: " +
       f"(Gesto: {max_at['at_fs2']['gesture']}, Eje: {max_at['at_fs2']['axis']})")
 
 #%% Importar resultados de Diseño de Analog Filter Wizard
-f, mag = import_AnalogFilterWizard('C:/Repositorio/SAPS_Gonzalez_C1_2025/DesignFiles/Data Files/Magnitude(dB).csv')
+f, mag = import_AnalogFilterWizard('dataset_clases/Magnitude(dB).csv')
 
 
 #%% Importar resultados de simulación en LTSpice
-f_sim, mag_sim, _ = import_AC_LTSpice('C:/Repositorio/SAPS_Gonzalez_C1_2025/DesignFiles/Data Files/filtro.txt')
+f_sim, mag_sim, _ = import_AC_LTSpice('filtro.txt')
 
 # Análisis de la atenuación del filtro simulado en las frecuencias de interés
 F_AT1 = FS2/2
@@ -268,3 +268,8 @@ mag_impl = [0.09001002453,
 ax3.plot(f_impl,  mag_impl, label='Implementado')
 
 plt.show()
+
+#%% Filtrado Digital
+
+# Graficacion de la señal origianl
+

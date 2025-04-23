@@ -38,7 +38,7 @@ def import_AC_LTSpice(filename):
     dB = np.array([])
     deg = np.array([])
     
-    with open(filename, 'r') as fp:
+    with open(filename, 'r', encoding='iso-8859-1') as fp:
         campos = fp.readline()
         
         STOP = False
