@@ -215,11 +215,11 @@ print(f"Atenuación requerida en {FS2/2} Hz: " +
       f"(Gesto: {max_at['at_fs2']['gesture']}, Eje: {max_at['at_fs2']['axis']})")
 
 #%% Importar resultados de Diseño de Analog Filter Wizard
-f, mag = import_AnalogFilterWizard('C:/Repositorio/SAPS_Gonzalez_C1_2025/DesignFiles/Data Files/Magnitude(dB).csv')
+f, mag = import_AnalogFilterWizard('dataset_clases/Magnitude(dB).csv')
 
 
 #%% Importar resultados de simulación en LTSpice
-f_sim, mag_sim, _ = import_AC_LTSpice('C:/Repositorio/SAPS_Gonzalez_C1_2025/DesignFiles/Data Files/filtro.txt')
+f_sim, mag_sim, _ = import_AC_LTSpice('filtro.txt')
 
 # Análisis de la atenuación del filtro simulado en las frecuencias de interés
 F_AT1 = FS2/2
@@ -276,6 +276,7 @@ ax3.plot(f_impl,  mag_impl, label='Implementado')
 
 plt.show()
 
+<<<<<<< HEAD
 #%% filtro digital
 
 # Parámetros para el remuestreo de las señales
@@ -434,4 +435,9 @@ print("El algoritmo de filtrado IIR toma {:.3f}s".format(t_end_iir - t_start_iir
 
 
 
+=======
+#%% Filtrado Digital
+
+# Graficacion de la señal origianl
+>>>>>>> 8a7413109e71450bdb7f1c2e39660a39f2f739b2
 
