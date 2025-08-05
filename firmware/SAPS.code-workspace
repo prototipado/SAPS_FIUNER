@@ -8,13 +8,11 @@
         "idf.portWin": "COM14",
         "idf.flashBaudRate": "115200",
         "idf.flashType": "JTAG",
-        "idf.adapterTargetName": "esp32c6",
         "cmake.configureOnOpen": false,
         "idf.svdFilePath": "${workspaceFolder}/../../esp32c6.svd",
         "idf.openOcdConfigs": [
             "board/esp32c6-builtin.cfg"
         ],
-        "idf.openOcdLaunchArgs": ["-c", "set ESP_RTOS none"],
         "files.associations": {
             "math.h": "c",
             "stdint.h": "c",
@@ -74,7 +72,9 @@
             "gpio_fast_out_mcu.h": "c",
             "cmath": "c",
             "complex": "c",
-            "butter.h": "c"
+            "butter.h": "c",
+            "cstdint": "c",
+            "window.h": "c"
         },
     },
     "tasks": {
