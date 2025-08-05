@@ -178,18 +178,22 @@ void SwitchesTask(void *pvParameter){
         if(teclas){
             switch(state){
                 case DATALOGGING:
+                    NeoPixelBrightness(64);
                     NeoPixelAllColor(NEOPIXEL_COLOR_GREEN);
                     printf("\n Pasando a modo DATALOGGING sin THRESHOLD \n");
                 break;
                 case DATALOGGING_THR:
+                    NeoPixelBrightness(64);
                     NeoPixelAllColor(NEOPIXEL_COLOR_BLUE);
                     printf("\n Pasando a modo DATALOGGING con THRESHOLD \n");
                 break;
                 case RECORD:
+                    NeoPixelBrightness(64);
                     NeoPixelAllColor(NEOPIXEL_COLOR_RED);
                     printf("\n Pasando a modo GRABACION \n");
                 break;
                 case INFERRING:
+                    NeoPixelBrightness(127);
                     NeoPixelAllColor(NEOPIXEL_COLOR_YELLOW);
                     printf("\n Pasando a modo INFERENCIA \n");
                 break;
@@ -305,7 +309,7 @@ void ProcessTask(void *pvParameter){
             #if defined(IIR_FILTER) || defined(FIR_FILTER)
             printf("%1.2f,",	mag_filt);
             printf("%1.2f,",	mag);
-            printf("%ld\n", (end_t - start_t)); // Tiempo de filtrado
+            printf("%ldus\n", (end_t - start_t) / CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ); // Tiempo de filtrado
             #else
             printf("%1.2f\n",	mag);
             #endif
@@ -364,7 +368,7 @@ void ProcessTask(void *pvParameter){
                     features[2] = z_mean / NUM_SAMPLES;
                     end_t = dsp_get_cpu_cycle_count();
                     /* Fin de cálculo de features */
-                    printf("%s (tiempo de inferencia: %ld ciclos)\n", predictLabel(features), (end_t - start_t));
+                    printf("%s (tiempo de inferencia: %ldus)\n", predictLabel(features), (end_t - start_t) / CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ);
                     frame = 0;
                     record_state = REFRACT_REC;
                     LedOff(LED_2);
@@ -431,6 +435,7 @@ void app_main(void){
 	/* LED estado incial */
     static neopixel_color_t color;
 	NeoPixelInit(BUILT_IN_RGB_LED_PIN, BUILT_IN_RGB_LED_LENGTH, &color);
+    NeoPixelBrightness(64);
     NeoPixelAllColor(NEOPIXEL_COLOR_GREEN);
 	printf("Inicio Firmware SAPS\n");
 
