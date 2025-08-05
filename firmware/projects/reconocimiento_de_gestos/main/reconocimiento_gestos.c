@@ -15,6 +15,7 @@
  * | 01/08/2023 | Correción de errores                                  |
  * | 01/07/2024 | Migración a ESP-IDF  	                                |
  * | 14/02/2025 | Cambios para realizar extracción de características   |
+ * | 05/08/2025 | Implementación de filtros FIR y medicion de tiempos   |
  *
  * @author Juan Ignacio Cerrudo (juan.cerrudo@uner.edu.ar)
  * @author Albano Peñalva (albano.penalva@uner.edu.ar)
