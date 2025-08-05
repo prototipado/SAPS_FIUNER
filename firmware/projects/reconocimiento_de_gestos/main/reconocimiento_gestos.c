@@ -39,13 +39,15 @@
 
 /* TODO: Incluir header con los coeficientes del filtro a utilizar */
 // #include "butter.h"
+// #include "window.h"
 /* TODO: Incluir header con el algoritmo de clasificación */
 // #include "classifier.h"
 
 /*==================[macros and definitions]=================================*/
 /* TODO: Luego de obtenido los coeficientes del filtro descomentar la siguiente 
 linea para agregar filtrado digital a las señales */
-// #define FILTER                              /**< @brief Filtrado digital activado */
+// #define IIR_FILTER                           /**< @brief Filtrado digital IIR activado */
+// #define FIR_FILTER                           /**< @brief Filtrado digital FIR activado */
 
 /* TODO: Luego de obtenido el modelo de inferencia descomentar la siguiente linea
  para activar la clasificación de señales */
@@ -81,6 +83,7 @@ typedef enum {
     REFRACT_REC             /**< @brief Periodo refractario. */
 } state_rec_t;
 
+uint32_t start_t, end_t;    /**< @brief Variables para medir el tiempo de filtrado. */
 /*==================[internal data definition]===============================*/
 
 TaskHandle_t process_task_handle = NULL;    /**< Handle tarea "process" */
@@ -112,10 +115,17 @@ float x_min, y_min, z_min;          /**< @brief Minimos de las señales. */
 float x_rms, y_rms, z_rms;          /**< @brief RMS de las señales. */
 #endif
 
-#ifdef FILTER
+#ifdef IIR_FILTER
 float delay_x[2*STAGES] = {0}; /**< @brief Arreglo para los estados del filtro del eje x (dos por cada etapa). */
 float delay_y[2*STAGES] = {0}; /**< @brief Arreglo para los estados del filtro del eje y (dos por cada etapa). */
 float delay_z[2*STAGES] = {0}; /**< @brief Arreglo para los estados del filtro del eje z (dos por cada etapa). */
+#endif
+
+#ifdef FIR_FILTER
+fir_f32_t fir_filter_x, fir_filter_y, fir_filter_z; /**< @brief Estructuras de filtros FIR. */
+float delay_x[FIR_ORDER+4] = {0}; /**< @brief Arreglo para los estados del filtro del eje x (dos por cada etapa). */
+float delay_y[FIR_ORDER+4] = {0}; /**< @brief Arreglo para los estados del filtro del eje y (dos por cada etapa). */
+float delay_z[FIR_ORDER+4] = {0}; /**< @brief Arreglo para los estados del filtro del eje z (dos por cada etapa). */
 #endif
 /*==================[internal functions declaration]=========================*/
 
@@ -194,6 +204,11 @@ void SwitchesTask(void *pvParameter){
  */
 void ProcessTask(void *pvParameter){
     float mag;
+    #ifdef FIR_FILTER
+    dsps_fir_init_f32(&fir_filter_x, fir_coeff, delay_x, FIR_ORDER);
+    dsps_fir_init_f32(&fir_filter_y, fir_coeff, delay_y, FIR_ORDER);
+    dsps_fir_init_f32(&fir_filter_z, fir_coeff, delay_z, FIR_ORDER);
+    #endif
     while(true){
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         x_G = ReadXValue();
@@ -201,8 +216,9 @@ void ProcessTask(void *pvParameter){
         z_G = ReadZValue();
         mag = sqrt((x_G*x_G) + (y_G*y_G) + (z_G*z_G));
 
-        #ifdef FILTER
+        #ifdef IIR_FILTER
         float mag_filt;
+        start_t = dsp_get_cpu_cycle_count();
         dsps_biquad_f32(&x_G, &x_G_filt, 1, ba_coeff, delay_x);
         dsps_biquad_f32(&y_G, &y_G_filt, 1, ba_coeff, delay_y);
         dsps_biquad_f32(&z_G, &z_G_filt, 1, ba_coeff, delay_z);
@@ -213,6 +229,17 @@ void ProcessTask(void *pvParameter){
                 dsps_biquad_f32(&z_G_filt, &z_G_filt, 1, &ba_coeff[i*5], &delay_z[i*2]);
             }
         }
+        end_t = dsp_get_cpu_cycle_count();
+        mag_filt = sqrt((x_G_filt*x_G_filt) + (y_G_filt*y_G_filt) + (z_G_filt*z_G_filt));
+        #endif
+
+        #ifdef FIR_FILTER
+        float mag_filt;
+        start_t = dsp_get_cpu_cycle_count();
+        dsps_fir_f32_ansi(&fir_filter_x, &x_G, &x_G_filt, 1);
+        dsps_fir_f32_ansi(&fir_filter_y, &y_G, &y_G_filt, 1);
+        dsps_fir_f32_ansi(&fir_filter_z, &z_G, &z_G_filt, 1);
+        end_t = dsp_get_cpu_cycle_count();
         mag_filt = sqrt((x_G_filt*x_G_filt) + (y_G_filt*y_G_filt) + (z_G_filt*z_G_filt));
         #endif
 
@@ -227,7 +254,7 @@ void ProcessTask(void *pvParameter){
                 break;
             case LOGGING_REC:
                 LedToggle(LED_2);
-                #ifdef FILTER
+                #if defined(IIR_FILTER) || defined(FIR_FILTER)
                 printf("%1.2f,", x_G_filt);
                 printf("%1.2f,", y_G_filt);
                 printf("%1.2f,", z_G_filt);
@@ -243,7 +270,7 @@ void ProcessTask(void *pvParameter){
                 break;
             case END_REC:
                 LedOff(LED_2);
-                #ifdef FILTER
+                #if defined(IIR_FILTER) || defined(FIR_FILTER)
                 printf("%1.2f,", x_G_filt);
                 printf("%1.2f,", y_G_filt);
                 printf("%1.2f\n", z_G_filt);
@@ -266,7 +293,7 @@ void ProcessTask(void *pvParameter){
         /* Modo Adquisición de datos sin Umbral*/
         case DATALOGGING:
             LedToggle(LED_2);
-            #ifdef FILTER
+            #if defined(IIR_FILTER) || defined(FIR_FILTER)
             printf("%1.2f,", 	x_G_filt);
             printf("%1.2f,", 	y_G_filt);
             printf("%1.2f,",	z_G_filt);
@@ -274,16 +301,19 @@ void ProcessTask(void *pvParameter){
             printf("%1.2f,", 	x_G);
             printf("%1.2f,", 	y_G);
             printf("%1.2f,",	z_G);
-            #ifdef FILTER
+            #if defined(IIR_FILTER) || defined(FIR_FILTER)
             printf("%1.2f,",	mag_filt);
-            #endif
+            printf("%1.2f,",	mag);
+            printf("%ld\n", (end_t - start_t)); // Tiempo de filtrado
+            #else
             printf("%1.2f\n",	mag);
+            #endif
             break; /* Fin del modo Adquisición de datos sin Umbral*/
         /* Modo Adquisición de datos con Umbral*/
         case DATALOGGING_THR:  
             if(motionDetected(x_G, y_G, z_G)){
                 LedToggle(LED_2);
-                #ifdef FILTER
+                #if defined(IIR_FILTER) || defined(FIR_FILTER)
                 printf("%1.2f,", 	x_G_filt);
                 printf("%1.2f,", 	y_G_filt);
                 printf("%1.2f,",	z_G_filt);
@@ -317,6 +347,7 @@ void ProcessTask(void *pvParameter){
                     LedToggle(LED_2);
                     break;
                 case END_REC:
+                    start_t = dsp_get_cpu_cycle_count();
                     /* TODO: Agregar el código necesario para el cálculo de las características.
                     A modo de ejemplo, se muestra el cálculo de las medias de las señales */
                     x_mean = 0;
@@ -330,8 +361,9 @@ void ProcessTask(void *pvParameter){
                     features[0] = x_mean / NUM_SAMPLES;
                     features[1] = y_mean / NUM_SAMPLES;
                     features[2] = z_mean / NUM_SAMPLES;
+                    end_t = dsp_get_cpu_cycle_count();
                     /* Fin de cálculo de features */
-                    printf("%s\n", predictLabel(features));
+                    printf("%s (tiempo de inferencia: %ld ciclos)\n", predictLabel(features), (end_t - start_t));
                     frame = 0;
                     record_state = REFRACT_REC;
                     LedOff(LED_2);
